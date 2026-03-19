@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSONLens — Visual JSON Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Epilogue:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0e14;--bg2:#12151e;--surface:#1e2235;--surface2:#252a3d;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8eaf6;--muted:#5c6080;--muted2:#8890b0;
+  --accent:#4f8eff;--aglow:rgba(79,142,255,0.15);
+  --green:#43e97b;--orange:#ffa94d;--purple:#c084fc;
+  --cyan:#38bdf8;--yellow:#fbbf24;--red:#f87171;
+  --r:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden}
+body{font-family:'Epilogue',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 15% 10%,rgba(79,142,255,0.055) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 85% 90%,rgba(192,132,252,0.045) 0%,transparent 60%);pointer-events:none;z-index:0}
+
+/* HEADER */
+header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border);background:rgba(12,14,20,0.92);backdrop-filter:blur(16px);flex-shrink:0;gap:10px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.logo-mark{width:29px;height:29px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:900;color:#fff;font-family:'JetBrains Mono',monospace}
+.logo-text{font-size:0.98rem;font-weight:900;letter-spacing:-0.04em}
+.logo-sub{font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase}
+.hctrl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sw{position:relative;display:flex;align-items:center}
+.sw svg{position:absolute;left:8px;width:13px;height:13px;color:var(--muted);pointer-events:none}
+#gSearch{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.74rem;padding:6px 36px 6px 28px;width:190px;outline:none;transition:border-color .2s,box-shadow .2s}
+#gSearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--aglow)}
+#gSearch::placeholder{color:var(--muted)}
+#sCnt{position:absolute;right:8px;font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--muted2);pointer-events:none}
+.btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted2);font-family:'Epilogue',sans-serif;font-size:0.7rem;font-weight:600;cursor:pointer;transition:all .18s;white-space:nowrap}
+.btn:hover{border-color:var(--border2);color:var(--text);background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:#3a7aee}
+.btn svg{width:11px;height:11px;flex-shrink:0}
+.vtog{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:3px;gap:2px}
+.vbtn{padding:4px 9px;border-radius:5px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:0.68rem;font-weight:700;font-family:'Epilogue',sans-serif;transition:all .15s;white-space:nowrap}
+.vbtn.active{background:var(--accent);color:#fff}
+.sbar{display:flex;gap:10px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:0.63rem;color:var(--muted2)}
+.si{display:flex;align-items:center;gap:4px}
+.sd{width:5px;height:5px;border-radius:50%}
+
+/* APP BODY */
+.app-body{position:relative;z-index:1;display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* LEFT PANEL */
+.lpanel{width:310px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);transition:width .25s ease;overflow:visible;position:relative;min-width:0}
+.lpanel.col{width:0;border-right:none}
+.lpanel-inner{display:flex;flex-direction:column;width:310px;min-width:310px;overflow:hidden;flex:1}
+.lpanel.col .lpanel-inner{visibility:hidden}
+.ph{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.pt{font-size:0.66rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted2)}
+/* Panel toggle tab — always visible on the right edge */
+.ptab{position:absolute;right:-15px;top:50%;transform:translateY(-50%);z-index:50;width:15px;height:42px;background:var(--surface);border:1px solid var(--border2);border-left:none;border-radius:0 6px 6px 0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s,color .15s,border-color .15s;color:var(--muted2);font-size:0.52rem;user-select:none}
+.ptab:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lpanel.col .ptab{border-left:1px solid var(--border2);border-radius:6px;background:var(--surface2)}
+.ea{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
+#jIn{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:1.65;padding:13px;resize:none;tab-size:2;overflow:auto}
+#jIn::placeholder{color:var(--muted)}
+.dov{position:absolute;inset:0;background:rgba(79,142,255,0.08);border:2px dashed var(--accent);border-radius:var(--r);display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;font-size:0.86rem;font-weight:700;color:var(--accent);pointer-events:none;z-index:20;margin:7px}
+.dov svg{width:34px;height:34px}
+.dropping .dov{display:flex}
+.ef{padding:6px 11px;border-top:1px solid var(--border);display:flex;gap:5px;flex-shrink:0}
+.eb{margin:0 11px 6px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);border-radius:6px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:var(--red);display:none;word-break:break-all}
+.eb.on{display:block}
+
+/* RESIZER */
+.rzr{width:4px;background:transparent;cursor:col-resize;flex-shrink:0;transition:background .15s;position:relative;z-index:40}
+.rzr:hover,.rzr.drag{background:var(--accent)}
+.lpanel.col~.rzr{width:0;cursor:default}
+
+/* CANVAS */
+.cva{flex:1;position:relative;overflow:hidden;background:var(--bg);min-width:0}
+/* dot grid */
+.cva::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,0.05) 1px,transparent 1px);background-size:26px 26px;pointer-events:none;z-index:0}
+
+/* infinite viewport */
+#vp{position:absolute;top:0;left:0;transform-origin:0 0;z-index:1;will-change:transform}
+
+/* cursor for map */
+.cva.panning{cursor:grabbing!important}
+.mm-active .cva:not(.panning){cursor:grab}
+
+/* scrollable view container */
+#cScroll{position:absolute;inset:0;overflow:auto;padding:20px;z-index:1}
+#cScroll::-webkit-scrollbar{width:5px;height:5px}
+#cScroll::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:3px}
+
+/* ZOOM CONTROLS */
+.zc{position:absolute;bottom:18px;right:18px;z-index:20;display:flex;flex-direction:column;gap:4px;align-items:center}
+.zb{width:32px;height:32px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-weight:700;line-height:1}
+.zb:hover{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
+.zl{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--muted2);text-align:center}
+
+/* EMPTY STATE */
+.es{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;color:var(--muted);z-index:5}
+.ei{font-size:2.6rem;opacity:.28}
+.es h2{font-size:1rem;font-weight:800;color:var(--muted2);letter-spacing:-.03em}
+.es p{font-size:0.78rem;text-align:center;max-width:260px;line-height:1.6}
+.esamp{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:3px}
+.sbtn{padding:5px 12px;border-radius:99px;border:1px solid var(--border2);background:var(--surface);color:var(--muted2);font-size:0.68rem;font-weight:600;cursor:pointer;transition:all .18s;font-family:'Epilogue',sans-serif}
+.sbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--aglow)}
+
+/* ── MINDMAP NODES ── */
+.mn{position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;width:260px;cursor:default;user-select:none;transition:border-color .2s,box-shadow .2s;z-index:2}
+.mn:hover{border-color:var(--border2);box-shadow:0 6px 30px rgba(0,0,0,0.55)}
+.mn.root{background:var(--surface2)}
+.mn.mm-hl{border-color:var(--yellow)!important;box-shadow:0 0 0 2px rgba(251,191,36,0.22)!important}
+.mnh{padding:7px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);border-radius:9px 9px 0 0;background:rgba(0,0,0,0.15)}
+.mnk{font-family:'JetBrains Mono',monospace;font-size:0.7rem;font-weight:600;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.mnb2{font-size:0.52rem;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;flex-shrink:0}
+.type-object{background:rgba(79,142,255,0.15);color:var(--accent)}
+.type-array{background:rgba(192,132,252,0.15);color:var(--purple)}
+.type-string{background:rgba(67,233,123,0.12);color:var(--green)}
+.type-number{background:rgba(255,169,77,0.12);color:var(--orange)}
+.type-boolean{background:rgba(56,189,248,0.12);color:var(--cyan)}
+.type-null{background:rgba(248,113,113,0.12);color:var(--red)}
+.mnbody{padding:5px 0}
+.mnbody.col{display:none}
+.mnrow{display:flex;align-items:center;padding:2px 10px;gap:7px;cursor:pointer;transition:background .1s}
+.mnrow:hover{background:rgba(255,255,255,0.04)}
+.mnrow.hl{background:rgba(251,191,36,0.1)}
+.mnrk{font-family:'JetBrains Mono',monospace;font-size:0.63rem;color:var(--muted2);flex-shrink:0;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mnrs{color:var(--muted);font-size:0.63rem;flex-shrink:0}
+.mnrv{font-family:'JetBrains Mono',monospace;font-size:0.63rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.vs{color:var(--green)}.vn{color:var(--orange)}.vb{color:var(--cyan)}.vnull{color:var(--red);font-style:italic}
+.mnft{padding:4px 10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.mnft.col{display:none}
+.mnc{font-family:'JetBrains Mono',monospace;font-size:0.57rem;color:var(--muted)}
+.mcb{background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.6rem;padding:2px 4px;border-radius:4px;transition:all .15s;font-family:'Epilogue',sans-serif;font-weight:600}
+.mcb:hover{color:var(--text);background:rgba(255,255,255,0.07)}
+
+/* SVG connector layer */
+#mmSvg{position:absolute;top:0;left:0;pointer-events:none;z-index:1;overflow:visible}
+.conn{fill:none;stroke-width:1.8;marker-end:url(#arr)}
+.c0{stroke:rgba(79,142,255,0.4)}
+.c1{stroke:rgba(192,132,252,0.35)}
+.c2{stroke:rgba(67,233,123,0.3)}
+.c3{stroke:rgba(255,169,77,0.25)}
+.c4{stroke:rgba(56,189,248,0.22)}
+
+/* ── NODE VIEW (non-map) ── */
+.nc{display:flex;flex-wrap:wrap;gap:13px;align-content:flex-start}
+.jn{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);min-width:220px;max-width:340px;flex:1 1 220px;overflow:hidden;transition:box-shadow .2s,border-color .2s}
+.jn:hover{border-color:var(--border2);box-shadow:0 4px 22px rgba(0,0,0,0.4)}
+.jn.hlit{border-color:var(--accent);box-shadow:0 0 0 2px var(--aglow)}
+.jn.smatch{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(251,191,36,0.2)}
+.nh{padding:8px 12px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.nt{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:0.73rem;font-weight:500}
+.nk{color:var(--accent);font-weight:600}
+.ntb{font-size:0.53rem;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.nact{display:flex;gap:3px}
+.nab{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 5px;border-radius:4px;font-size:0.63rem;transition:all .15s;font-family:'Epilogue',sans-serif;font-weight:600}
+.nab:hover{color:var(--text);background:rgba(255,255,255,0.07)}
+.nb{padding:7px 0}
+.nr{display:flex;align-items:baseline;padding:2px 12px;gap:8px;transition:background .12s;cursor:pointer;position:relative}
+.nr:hover{background:rgba(255,255,255,0.03)}
+.nr.smr{background:rgba(251,191,36,0.08)}
+.nr.smr::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--yellow)}
+.nrk{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--muted2);flex-shrink:0;min-width:65px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nrsp{color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:0.68rem;flex-shrink:0}
+.nrv{font-family:'JetBrains Mono',monospace;font-size:0.68rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.vst{color:var(--green)}.vnu{color:var(--orange)}.vbo{color:var(--cyan)}.vni{color:var(--red);font-style:italic}
+.vrf{color:var(--accent);display:inline-flex;align-items:center;gap:3px}
+.vrb{font-size:0.53rem;padding:1px 5px;border-radius:3px;background:var(--aglow);color:var(--accent);font-weight:600}
+.nf{padding:4px 12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.nct{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--muted)}
+.nb.col,.nf.col{display:none}
+.nri{color:var(--purple);min-width:26px;font-family:'JetBrains Mono',monospace;font-size:0.63rem;font-weight:500}
+.nsw{display:none;padding:5px 8px;background:rgba(79,142,255,0.06);border-bottom:1px solid var(--border)}
+.nsw.on{display:flex;gap:5px;align-items:center}
+.nsi{background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.67rem;padding:3px 7px;outline:none;flex:1}
+.nsi:focus{border-color:var(--accent)}
+
+/* TREE */
+.tv{font-family:'JetBrains Mono',monospace;font-size:0.77rem;line-height:1.8}
+.tn{position:relative}
+.tr{display:flex;align-items:center;gap:5px;padding:1px 3px;cursor:pointer;border-radius:4px;transition:background .12s}
+.tr:hover{background:rgba(255,255,255,0.04)}
+.tr.smt{background:rgba(251,191,36,0.1)}
+.tt{width:13px;height:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted);font-size:0.57rem;transition:transform .15s}
+.tt.o{transform:rotate(90deg)}
+.tt.lf{opacity:0;pointer-events:none}
+.tk{color:var(--accent)}.tc{color:var(--muted);margin:0 2px}
+.tvs{color:var(--green)}.tvn{color:var(--orange)}.tvb{color:var(--cyan)}.tvnull{color:var(--red);font-style:italic}
+.tbr{color:var(--muted2)}
+.tch{margin-left:17px;border-left:1px solid var(--border);padding-left:8px}
+.tch.h{display:none}
+.tct{color:var(--muted);font-size:0.63rem;margin-left:3px}
+
+/* RAW */
+.rv{font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:1.7;white-space:pre-wrap;word-break:break-all;color:var(--text)}
+.rk{color:var(--accent)}.rs{color:var(--green)}.rn{color:var(--orange)}.rb{color:var(--cyan)}.rnull{color:var(--red)}.rp{color:var(--muted2)}
+.rv mark{background:rgba(251,191,36,0.35);color:var(--yellow);border-radius:2px;padding:0 1px;font-family:inherit;font-size:inherit}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--surface2);border:1px solid var(--border2);border-radius:99px;padding:7px 16px;font-size:0.73rem;font-family:'JetBrains Mono',monospace;color:var(--text);opacity:0;transition:all .25s;pointer-events:none;z-index:999;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.td{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+
+/* hint bar */
+.hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--muted);background:rgba(12,14,20,0.75);padding:4px 12px;border-radius:99px;pointer-events:none;z-index:10;white-space:nowrap;backdrop-filter:blur(6px);border:1px solid var(--border)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">{}</div>
+    <div>
+      <div class="logo-text">JSONLens</div>
+      <div class="logo-sub">Visual JSON Explorer</div>
+    </div>
+  </div>
+
+  <div class="hctrl">
+    <div class="sw">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="gSearch" placeholder="Search…" oninput="gSearch(this.value)">
+      <span id="sCnt"></span>
+    </div>
+
+    <div class="vtog">
+      <button class="vbtn active" onclick="setView('map',this)">✦ Map</button>
+      <button class="vbtn" onclick="setView('nodes',this)">⬡ Nodes</button>
+      <button class="vbtn" onclick="setView('tree',this)">⌥ Tree</button>
+      <button class="vbtn" onclick="setView('raw',this)">＜/＞ Raw</button>
+    </div>
+
+    <button class="btn" onclick="prettify()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Prettify
+    </button>
+    <button class="btn" onclick="minify()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>Minify
+    </button>
+    <button class="btn" onclick="copyAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy
+    </button>
+    <button class="btn" id="btnFit" style="display:none" onclick="fitMap()">⊕ Fit</button>
+    <button class="btn pri" onclick="document.getElementById('fi').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Load File
+    </button>
+    <input type="file" id="fi" accept=".json,application/json" style="display:none" onchange="loadFile(event)">
+  </div>
+
+  <div class="sbar" id="sbar" style="display:none">
+    <div class="si"><div class="sd" style="background:var(--accent)"></div><span id="sk">0 keys</span></div>
+    <div class="si"><div class="sd" style="background:var(--purple)"></div><span id="sd2">depth 0</span></div>
+    <div class="si"><div class="sd" style="background:var(--green)"></div><span id="ss">0 B</span></div>
+  </div>
+</header>
+
+<div class="app-body" id="app">
+  <!-- Editor -->
+  <div class="lpanel" id="lp">
+    <div class="ptab" id="ptab" onclick="togglePanel()" title="Toggle panel">◀</div>
+    <div class="lpanel-inner">
+    <div class="ph">
+      <span class="pt">JSON Input</span>
+      <div style="display:flex;gap:5px">
+        <button class="btn" style="padding:3px 7px;font-size:0.63rem" onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+    <div class="ea" id="ea">
+      <div class="dov" id="dov">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Drop JSON file
+      </div>
+      <textarea id="jIn" spellcheck="false" placeholder="Paste JSON here…&#10;&#10;Or drag &amp; drop a .json file" oninput="onIn()" onkeydown="tabKey(event)"></textarea>
+    </div>
+    <div class="eb" id="eb"></div>
+    <div class="ef">
+      <button class="btn" style="flex:1;justify-content:center" onclick="prettify()">Prettify</button>
+      <button class="btn pri" style="flex:1;justify-content:center" onclick="go()">▶ Visualize</button>
+    </div>
+    </div><!-- /lpanel-inner -->
+  </div>
+
+  <div class="rzr" id="rzr"></div>
+
+  <!-- Canvas -->
+  <div class="cva" id="cva">
+
+    <!-- Empty -->
+    <div class="es" id="emSt">
+      <div class="ei">{ }</div>
+      <h2>No JSON loaded</h2>
+      <p>Paste JSON in the editor, drag &amp; drop a file, or try a sample.</p>
+      <div class="esamp">
+        <button class="sbtn" onclick="sample('user')">👤 User</button>
+        <button class="sbtn" onclick="sample('api')">🔌 API</button>
+        <button class="sbtn" onclick="sample('config')">⚙️ Config</button>
+        <button class="sbtn" onclick="sample('deep')">🗂 Nested</button>
+      </div>
+    </div>
+
+    <!-- MAP mode: infinite canvas -->
+    <div id="mapWrap" style="display:none;position:absolute;inset:0;overflow:hidden">
+      <div class="hint">Drag to pan &nbsp;·&nbsp; Scroll / pinch to zoom &nbsp;·&nbsp; Click any value to copy</div>
+      <div id="vp" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform">
+        <svg id="mmSvg" style="position:absolute;top:0;left:0;overflow:visible;pointer-events:none;z-index:1">
+          <defs>
+            <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <path d="M0,0 L0,7 L7,3.5 z" fill="rgba(255,255,255,0.18)"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+      <!-- zoom controls -->
+      <div class="zc">
+        <button class="zb" onclick="zBy(0.15)" title="Zoom in">+</button>
+        <div class="zl" id="zLbl">100%</div>
+        <button class="zb" onclick="zBy(-0.15)" title="Zoom out">−</button>
+        <button class="zb" onclick="fitMap()" style="font-size:0.6rem;margin-top:2px" title="Fit">FIT</button>
+      </div>
+    </div>
+
+    <!-- Scrollable views -->
+    <div id="cScroll" style="display:none;position:absolute;inset:0;overflow:auto;padding:20px;z-index:1">
+      <div id="viz"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="td"></div><span id="tmsg">Copied!</span></div>
+
+<script>
+// ═══ STATE ═══════════════════════════════════════════════
+let DATA = null;
+let VIEW = 'map';
+let SQ = '';
+let sc = 1, ox = 60, oy = 40; // scale, offset x/y
+let panning = false, px0=0, py0=0, ox0=0, oy0=0;
+let nidx = 0;       // node id counter
+let nodeMap = {};   // id -> {el, x, y, parentId, depth}
+
+// ═══ UTILS ═══════════════════════════════════════════════
+function T(msg, col='var(--green)') {
+  const t=document.getElementById('toast');
+  document.getElementById('tmsg').textContent=msg;
+  t.querySelector('.td').style.background=col;
+  t.classList.add('on'); clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('on'), 2200);
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function typ(v){if(v===null)return'null';if(Array.isArray(v))return'array';return typeof v;}
+function copy(t){navigator.clipboard.writeText(t).then(()=>T('Copied!')).catch(()=>{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();T('Copied!')});}
+function allKeys(o){if(typeof o!=='object'||o===null)return 0;let n=Object.keys(o).length;Object.values(o).forEach(v=>{if(typeof v==='object'&&v!==null)n+=allKeys(v);});return n;}
+function depth(o){if(typeof o!=='object'||o===null)return 0;const v=Object.values(o);return v.length?1+Math.max(...v.map(depth)):1;}
+function fmtB(n){if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(2)+' MB';}
+function badge(type){return`<span class="mnb2 type-${type}">${type}</span>`;}
+function primVal(v){
+  const t=typ(v);
+  if(t==='string')return`<span class="vs">"${esc(v.length>40?v.slice(0,40)+'…':v)}"</span>`;
+  if(t==='number')return`<span class="vn">${v}</span>`;
+  if(t==='boolean')return`<span class="vb">${v}</span>`;
+  if(t==='null')return`<span class="vnull">null</span>`;
+  const c=Array.isArray(v)?v.length:Object.keys(v).length;
+  return`<span style="color:var(--muted2)">${t==='array'?'[':'{'} ${c} ${t==='array'?']':'}'}</span>`;
+}
+
+// ═══ PARSE / RENDER ══════════════════════════════════════
+let dbt;
+function onIn(){clearTimeout(dbt);dbt=setTimeout(go,700);}
+
+function go(){
+  const raw=document.getElementById('jIn').value.trim();
+  const eb=document.getElementById('eb');
+  if(!raw){DATA=null;showEmpty();eb.classList.remove('on');return;}
+  try{
+    DATA=JSON.parse(raw);
+    eb.classList.remove('on');
+    document.getElementById('sbar').style.display='flex';
+    document.getElementById('sk').textContent=allKeys(DATA)+' keys';
+    document.getElementById('sd2').textContent='depth '+depth(DATA);
+    document.getElementById('ss').textContent=fmtB(new Blob([raw]).size);
+    render();
+  }catch(e){eb.textContent='⚠ '+e.message;eb.classList.add('on');showEmpty();}
+}
+
+function render(){
+  if(!DATA)return;
+  nidx=0; nodeMap={};
+  document.getElementById('emSt').style.display='none';
+  document.getElementById('mapWrap').style.display='none';
+  document.getElementById('cScroll').style.display='none';
+  document.getElementById('btnFit').style.display='none';
+  document.getElementById('cva').classList.remove('mm-active');
+
+  if(VIEW==='map'){
+    document.getElementById('mapWrap').style.display='block';
+    document.getElementById('btnFit').style.display='flex';
+    document.getElementById('cva').classList.add('mm-active');
+    buildMap();
+  } else {
+    document.getElementById('cScroll').style.display='block';
+    const v=document.getElementById('viz'); v.innerHTML='';
+    if(VIEW==='nodes') buildNodes(v);
+    else if(VIEW==='tree') buildTree(v);
+    else buildRaw(v);
+  }
+  if(SQ) gSearch(SQ);
+}
+
+function showEmpty(){
+  document.getElementById('emSt').style.display='flex';
+  document.getElementById('mapWrap').style.display='none';
+  document.getElementById('cScroll').style.display='none';
+  document.getElementById('sbar').style.display='none';
+}
+
+// ═══ MAP / MINDMAP ════════════════════════════════════════
+const NODE_W = 260;
+const COL_GAP = 100;  // horizontal gap between parent right and child left
+const ROW_GAP = 24;   // vertical gap between sibling nodes
+
+function nodeH(data){
+  const t=typ(data);
+  if(t!=='object'&&t!=='array') return 52;
+  const ents=Array.isArray(data)?data.map((v,i)=>[i,v]):Object.entries(data);
+  const prims=ents.filter(([,v])=>typ(v)!=='object'&&typ(v)!=='array');
+  const rows=Math.min(prims.length, 10);
+  return 35 + rows*21 + (prims.length>10?18:0) + 26;
+}
+
+function subtreeH(data){
+  const t=typ(data);
+  if(t!=='object'&&t!=='array') return nodeH(data);
+  const ents=Array.isArray(data)?data.map((v,i)=>[i,v]):Object.entries(data);
+  const complex=ents.filter(([,v])=>typ(v)==='object'||typ(v)==='array');
+  if(!complex.length) return nodeH(data);
+  const childrenH=complex.reduce((s,[,v])=>s+subtreeH(v)+ROW_GAP,0)-ROW_GAP;
+  return Math.max(nodeH(data), childrenH);
+}
+
+function buildMap(){
+  const vp=document.getElementById('vp');
+  // remove old nodes
+  Array.from(vp.children).forEach(c=>{if(c.id!=='mmSvg')c.remove();});
+  const svg=document.getElementById('mmSvg');
+  svg.innerHTML=`<defs><marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="rgba(255,255,255,0.18)"/></marker></defs>`;
+
+  // layout
+  const layout=[];
+  placeNode(DATA,'root',0,0,null,layout);
+
+  // find total bounds
+  let maxX=0,maxY=0;
+  layout.forEach(n=>{maxX=Math.max(maxX,n.x+NODE_W+80);maxY=Math.max(maxY,n.y+n.h+80);});
+  vp.style.width=maxX+'px'; vp.style.height=maxY+'px';
+  svg.setAttribute('width',maxX); svg.setAttribute('height',maxY);
+
+  // create DOM nodes
+  layout.forEach(n=>makeMmNode(n,vp));
+
+  // draw connectors after layout is in DOM
+  requestAnimationFrame(()=>{
+    layout.forEach(n=>{
+      if(n.parentId===null) return;
+      const parent=layout.find(l=>l.id===n.parentId);
+      if(!parent)return;
+      drawConn(svg, parent, n);
+    });
+    fitMap();
+  });
+}
+
+function placeNode(data, key, depth, startY, parentId, layout){
+  const id='n'+(++nidx);
+  const t=typ(data);
+  const h=nodeH(data);
+  const x=depth*(NODE_W+COL_GAP);
+  const node={id,key:String(key),data,depth,x,y:startY,h,parentId,t};
+  layout.push(node);
+
+  if(t==='object'||t==='array'){
+    const ents=Array.isArray(data)?data.map((v,i)=>[i,v]):Object.entries(data);
+    const complex=ents.filter(([,v])=>typ(v)==='object'||typ(v)==='array');
+    // vertically center children around parent center
+    const totalChildH=complex.reduce((s,[,v])=>s+subtreeH(v)+ROW_GAP,0)-ROW_GAP;
+    const parentCenter=startY+h/2;
+    let cy=parentCenter-totalChildH/2;
+    complex.forEach(([k,v])=>{
+      const childH=subtreeH(v);
+      placeNode(v,k,depth+1,cy,id,layout);
+      cy+=childH+ROW_GAP;
+    });
+  }
+}
+
+function makeMmNode(n, vp){
+  const el=document.createElement('div');
+  el.className='mn'+(n.depth===0?' root':'');
+  el.id=n.id;
+  el.style.cssText=`left:${n.x}px;top:${n.y}px;width:${NODE_W}px`;
+
+  const colors=['var(--accent)','var(--purple)','var(--green)','var(--orange)','var(--cyan)'];
+  const ac=colors[n.depth%colors.length];
+  if(n.depth>0) el.style.borderColor=ac+'60';
+
+  const ents=n.t==='object'||n.t==='array'
+    ? (Array.isArray(n.data)?n.data.map((v,i)=>[i,v]):Object.entries(n.data))
+    : [];
+  const prims=ents.filter(([,v])=>typ(v)!=='object'&&typ(v)!=='array');
+  const cxCount=ents.length-prims.length;
+
+  // header
+  const hdr=document.createElement('div');
+  hdr.className='mnh';
+  hdr.style.borderBottom='1px solid '+ac+'33';
+  hdr.innerHTML=`<span class="mnk" style="color:${ac}" title="${esc(n.key)}">${esc(n.key)}</span>${badge(n.t)}<button class="mcb" onclick="collapseNode('${n.id}',this)" title="Collapse">▾</button>`;
+  el.appendChild(hdr);
+
+  // body
+  const body=document.createElement('div');
+  body.className='mnbody'; body.id='mb'+n.id;
+  const maxR=10;
+  prims.slice(0,maxR).forEach(([k,v])=>{
+    const row=document.createElement('div');
+    row.className='mnrow';
+    row.dataset.k=String(k).toLowerCase();
+    row.dataset.v=JSON.stringify(v).toLowerCase();
+    row.title='Click to copy value';
+    row.onclick=()=>copy(JSON.stringify(v));
+    row.innerHTML=`<span class="mnrk" title="${esc(String(k))}">${esc(String(k))}</span><span class="mnrs">:</span><span class="mnrv">${primVal(v)}</span>`;
+    body.appendChild(row);
+  });
+  if(prims.length>maxR){
+    const m=document.createElement('div');
+    m.style.cssText='padding:2px 10px;font-family:JetBrains Mono,monospace;font-size:0.58rem;color:var(--muted)';
+    m.textContent=`+${prims.length-maxR} more properties…`;
+    body.appendChild(m);
+  }
+  if(cxCount){
+    const ref=document.createElement('div');
+    ref.style.cssText='padding:3px 10px;font-family:JetBrains Mono,monospace;font-size:0.6rem;color:var(--muted2)';
+    ref.innerHTML=`<span style="color:${ac}">→</span> ${cxCount} nested node${cxCount>1?'s':''}`;
+    body.appendChild(ref);
+  }
+  el.appendChild(body);
+
+  // footer
+  const ft=document.createElement('div');
+  ft.className='mnft'; ft.id='mf'+n.id;
+  ft.innerHTML=`<span class="mnc">${ents.length} item${ents.length!==1?'s':''}</span><button class="mcb" title="Copy node JSON">⎘ copy</button>`;
+  ft.querySelector('.mcb').onclick=e=>{e.stopPropagation();copy(JSON.stringify(n.data,null,2));};
+  el.appendChild(ft);
+
+  el.__jdata=n.data;
+  nodeMap[n.id]={el,x:n.x,y:n.y,h:el.offsetHeight||n.h,parentId:n.parentId,depth:n.depth};
+  vp.appendChild(el);
+}
+
+function drawConn(svg, parent, child){
+  const pel=document.getElementById(parent.id);
+  const cel=document.getElementById(child.id);
+  if(!pel||!cel) return;
+  const ph=pel.offsetHeight||parent.h;
+  const ch=cel.offsetHeight||child.h;
+
+  const x1=parent.x+NODE_W;
+  const y1=parent.y+ph/2;
+  const x2=child.x;
+  const y2=child.y+ch/2;
+  const cx=(x1+x2)/2;
+
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',`M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`);
+  path.setAttribute('class',`conn c${Math.min(parent.depth,4)}`);
+  path.setAttribute('marker-end','url(#arr)');
+  svg.appendChild(path);
+}
+
+function collapseNode(id,btn){
+  const body=document.getElementById('mb'+id);
+  const ft=document.getElementById('mf'+id);
+  if(!body) return;
+  const c=body.classList.toggle('col');
+  if(ft) ft.classList.toggle('col',c);
+  btn.textContent=c?'▸':'▾';
+}
+
+// ═══ PAN & ZOOM ══════════════════════════════════════════
+const cva=document.getElementById('cva');
+
+function applyT(){
+  document.getElementById('vp').style.transform=`translate(${ox}px,${oy}px) scale(${sc})`;
+  document.getElementById('zLbl').textContent=Math.round(sc*100)+'%';
+}
+
+function zBy(delta,cx,cy){
+  if(VIEW!=='map') return;
+  const rect=cva.getBoundingClientRect();
+  cx=cx??rect.width/2; cy=cy??rect.height/2;
+  const ns=Math.max(0.08,Math.min(5,sc+delta));
+  const r=ns/sc;
+  ox=cx-(cx-ox)*r;
+  oy=cy-(cy-oy)*r;
+  sc=ns;
+  applyT();
+}
+
+function fitMap(){
+  const vp=document.getElementById('vp');
+  const rect=cva.getBoundingClientRect();
+  const vpW=parseFloat(vp.style.width)||1200;
+  const vpH=parseFloat(vp.style.height)||800;
+  const pad=60;
+  sc=Math.min((rect.width-pad*2)/vpW,(rect.height-pad*2)/vpH,1);
+  ox=(rect.width-vpW*sc)/2;
+  oy=(rect.height-vpH*sc)/2;
+  applyT();
+}
+
+// mouse pan
+cva.addEventListener('mousedown',e=>{
+  if(VIEW!=='map'||e.button!==0) return;
+  // don't start pan if clicking a button/input inside a node
+  if(e.target.closest('.mn')) return;
+  panning=true;
+  px0=e.clientX; py0=e.clientY; ox0=ox; oy0=oy;
+  cva.classList.add('panning');
+  e.preventDefault();
+},{passive:false});
+
+window.addEventListener('mousemove',e=>{
+  if(!panning) return;
+  ox=ox0+(e.clientX-px0);
+  oy=oy0+(e.clientY-py0);
+  applyT();
+});
+window.addEventListener('mouseup',()=>{ panning=false; cva.classList.remove('panning'); });
+
+// scroll zoom
+cva.addEventListener('wheel',e=>{
+  if(VIEW!=='map') return;
+  e.preventDefault();
+  const rect=cva.getBoundingClientRect();
+  zBy(e.deltaY<0?0.12:-0.12, e.clientX-rect.left, e.clientY-rect.top);
+},{passive:false});
+
+// touch
+let td0=0,tx0=0,ty0=0,tox0=0,toy0=0;
+cva.addEventListener('touchstart',e=>{
+  if(VIEW!=='map') return;
+  if(e.touches.length===2){
+    td0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  } else {
+    tx0=e.touches[0].clientX; ty0=e.touches[0].clientY; tox0=ox; toy0=oy;
+  }
+},{passive:true});
+cva.addEventListener('touchmove',e=>{
+  if(VIEW!=='map') return;
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const mx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+    const my=(e.touches[0].clientY+e.touches[1].clientY)/2;
+    const rect=cva.getBoundingClientRect();
+    zBy((d-td0)*0.006,mx-rect.left,my-rect.top);
+    td0=d;
+  } else {
+    ox=tox0+(e.touches[0].clientX-tx0);
+    oy=toy0+(e.touches[0].clientY-ty0);
+    applyT();
+  }
+},{passive:true});
+
+// map pan: also allow dragging when clicking on empty space in mapWrap
+document.getElementById('mapWrap').addEventListener('mousedown',e=>{
+  if(VIEW!=='map'||e.button!==0) return;
+  if(e.target.closest('.mn')) return;
+  panning=true;
+  px0=e.clientX; py0=e.clientY; ox0=ox; oy0=oy;
+  cva.classList.add('panning');
+  e.preventDefault();
+},{passive:false});
+
+// ═══ NODE VIEW ═══════════════════════════════════════════
+function buildNodes(container){
+  const wrap=document.createElement('div'); wrap.className='nc';
+  buildNodeRec(DATA,'root',wrap);
+  container.appendChild(wrap);
+}
+function buildNodeRec(data,key,container){
+  const t=typ(data);
+  if(t!=='object'&&t!=='array'){container.appendChild(scalarNode(key,data));return;}
+  const el=document.createElement('div'); el.className='jn'; el.id='jn-'+key;
+  const ents=Array.isArray(data)?data.map((v,i)=>[i,v]):Object.entries(data);
+  const hdr=document.createElement('div'); hdr.className='nh';
+  hdr.innerHTML=`<div class="nt"><span class="nk">${esc(String(key))}</span><span class="ntb type-${t}">${t}</span></div>
+    <div class="nact">
+      <button class="nab" onclick="openNodeSearch('jn-${esc(String(key))}',event)">⌕</button>
+      <button class="nab" onclick="copyNodeData('${esc(String(key))}',event)">⎘</button>
+      <button class="nab" onclick="togNode('body-${esc(String(key))}','ft-${esc(String(key))}',this)">▾</button>
+    </div>`;
+  window.__nd=window.__nd||{}; window.__nd[String(key)]=data;
+  el.appendChild(hdr);
+  const nsw=document.createElement('div'); nsw.className='nsw'; nsw.id='nsw-'+key;
+  nsw.innerHTML=`<input class="nsi" type="text" placeholder="Search in node…" oninput="nodeFilter('${esc(String(key))}',this.value)">
+    <button class="nab" onclick="closeNs('${esc(String(key))}')">✕</button>`;
+  el.appendChild(nsw);
+  const body=document.createElement('div'); body.className='nb'; body.id='body-'+key;
+  ents.forEach(([k,v])=>{
+    const row=document.createElement('div'); row.className='nr';
+    row.dataset.rk=String(k); row.dataset.rv=JSON.stringify(v).toLowerCase();
+    row.title='Click to copy'; row.onclick=e=>{e.stopPropagation();copy(JSON.stringify(v));};
+    row.innerHTML=Array.isArray(data)
+      ?`<span class="nri">[${k}]</span><span class="nrsp">→</span><div class="nrv">${nodeVal(v)}</div>`
+      :`<span class="nrk">${esc(String(k))}</span><span class="nrsp">:</span><div class="nrv">${nodeVal(v)}</div>`;
+    body.appendChild(row);
+  });
+  el.appendChild(body);
+  const ft=document.createElement('div'); ft.className='nf'; ft.id='ft-'+key;
+  ft.innerHTML=`<span class="nct">${ents.length} items</span>`;
+  el.appendChild(ft);
+  container.appendChild(el);
+  ents.forEach(([k,v])=>{if(typ(v)==='object'||typ(v)==='array')buildNodeRec(v,k,container);});
+}
+function nodeVal(v){
+  const t=typ(v);
+  if(t==='object'||t==='array'){const c=Array.isArray(v)?v.length:Object.keys(v).length;return`<span class="vrf">${t==='array'?'[':'{'}<span class="vrb">${c}</span>${t==='array'?']':'}'}</span>`;}
+  if(t==='string')return`<span class="vst">"${esc(v.length>55?v.slice(0,55)+'…':v)}"</span>`;
+  if(t==='number')return`<span class="vnu">${v}</span>`;
+  if(t==='boolean')return`<span class="vbo">${v}</span>`;
+  return`<span class="vni">null</span>`;
+}
+function scalarNode(key,val){
+  const el=document.createElement('div'); el.className='jn';
+  el.innerHTML=`<div class="nh"><div class="nt"><span class="nk">${esc(String(key))}</span><span class="ntb type-${typ(val)}">${typ(val)}</span></div><button class="nab" onclick="copy('${esc(String(val))}')">⎘</button></div>
+    <div class="nb"><div class="nr"><div class="nrv">${nodeVal(val)}</div></div></div>`;
+  return el;
+}
+function togNode(bid,fid,btn){
+  const b=document.getElementById(bid),f=document.getElementById(fid);
+  if(!b)return;const c=b.classList.toggle('col');if(f)f.classList.toggle('col',c);btn.textContent=c?'▸':'▾';
+}
+function copyNodeData(key,e){e&&e.stopPropagation();copy(JSON.stringify((window.__nd||{})[key]||{},null,2));}
+function openNodeSearch(id,e){e&&e.stopPropagation();const k=id.replace('jn-',''),w=document.getElementById('nsw-'+k);if(w){w.classList.toggle('on');if(w.classList.contains('on'))w.querySelector('input').focus();}}
+function closeNs(key){const w=document.getElementById('nsw-'+key);if(w){w.classList.remove('on');nodeFilter(key,'');w.querySelector('input').value='';}}
+function nodeFilter(key,q){const b=document.getElementById('body-'+key);if(!b)return;const lq=q.toLowerCase();b.querySelectorAll('.nr').forEach(r=>{const m=!lq||r.dataset.rk.toLowerCase().includes(lq)||(r.dataset.rv||'').includes(lq);r.classList.toggle('smr',!!(lq&&m));r.style.display=(!lq||m)?'':'none';});}
+
+// ═══ TREE VIEW ═══════════════════════════════════════════
+function buildTree(container){
+  const w=document.createElement('div');w.className='tv';
+  w.appendChild(treeNode(DATA,'root',0));
+  container.appendChild(w);
+}
+function treeNode(val,key,d){
+  const t=typ(val),w=document.createElement('div');w.className='tn';
+  const row=document.createElement('div');row.className='tr';
+  row.dataset.sv=JSON.stringify(val).toLowerCase();row.dataset.k=String(key);
+  const isC=t==='object'||t==='array';
+  const tog=document.createElement('span');tog.className='tt'+(isC?' o':' lf');tog.textContent='▶';row.appendChild(tog);
+  if(d>0||key!=='root'){const ke=document.createElement('span');ke.className='tk';ke.textContent=`"${key}"`;row.appendChild(ke);const co=document.createElement('span');co.className='tc';co.textContent=': ';row.appendChild(co);}
+  if(isC){
+    const cnt=Array.isArray(val)?val.length:Object.keys(val).length;
+    const ob=document.createElement('span');ob.className='tbr';ob.textContent=t==='array'?'[':'{';row.appendChild(ob);
+    const cn=document.createElement('span');cn.className='tct';cn.textContent=` ${cnt} item${cnt!==1?'s':''}`;row.appendChild(cn);
+    const ch=document.createElement('div');ch.className='tch';
+    (Array.isArray(val)?val.map((v,i)=>[i,v]):Object.entries(val)).forEach(([k,v])=>ch.appendChild(treeNode(v,k,d+1)));
+    const cr=document.createElement('div');cr.className='tr';const cb=document.createElement('span');cb.className='tbr';cb.textContent=t==='array'?']':'}';cr.appendChild(cb);ch.appendChild(cr);
+    tog.addEventListener('click',e=>{e.stopPropagation();const h=ch.classList.toggle('h');tog.classList.toggle('o',!h);});
+    row.addEventListener('click',()=>copy(JSON.stringify(val,null,2)));
+    w.appendChild(row);w.appendChild(ch);
+  } else {
+    const ve=document.createElement('span');
+    if(t==='string'){ve.className='tvs';ve.textContent=`"${val}"`;}
+    else if(t==='number'){ve.className='tvn';ve.textContent=val;}
+    else if(t==='boolean'){ve.className='tvb';ve.textContent=val;}
+    else{ve.className='tvnull';ve.textContent='null';}
+    row.appendChild(ve);row.addEventListener('click',()=>copy(String(val)));w.appendChild(row);
+  }
+  return w;
+}
+
+// ═══ RAW VIEW ════════════════════════════════════════════
+function buildRaw(container){
+  const d=document.createElement('div');d.className='rv';
+  d.id='rawView';
+  d.innerHTML=syntaxHL(JSON.stringify(DATA,null,2));
+  container.appendChild(d);
+}
+function highlightRaw(q){
+  const rv=document.getElementById('rawView');
+  if(!rv) return;
+  // strip any existing marks
+  rv.innerHTML=syntaxHL(JSON.stringify(DATA,null,2));
+  if(!q) return;
+  // walk text nodes and wrap matches
+  const escaped=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re=new RegExp('('+escaped+')','gi');
+  function walkAndMark(node){
+    if(node.nodeType===3){
+      if(re.test(node.textContent)){
+        const span=document.createElement('span');
+        span.innerHTML=node.textContent.replace(re,'<mark>$1</mark>');
+        node.parentNode.replaceChild(span,node);
+      }
+    } else if(node.nodeType===1&&node.nodeName!=='MARK'){
+      Array.from(node.childNodes).forEach(walkAndMark);
+    }
+  }
+  walkAndMark(rv);
+  // scroll to first match
+  const first=rv.querySelector('mark');
+  if(first) first.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function syntaxHL(j){
+  return j.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,m=>{
+      if(/^"/.test(m)){if(/:$/.test(m))return`<span class="rk">${m}</span>`;return`<span class="rs">${m}</span>`;}
+      if(/true|false/.test(m))return`<span class="rb">${m}</span>`;
+      if(/null/.test(m))return`<span class="rnull">${m}</span>`;
+      return`<span class="rn">${m}</span>`;
+    }).replace(/([{}\[\],])/g,'<span class="rp">$1</span>');
+}
+
+// ═══ GLOBAL SEARCH ════════════════════════════════════════
+function gSearch(q){
+  SQ=q.toLowerCase();
+  const cnt=document.getElementById('sCnt');
+  document.querySelectorAll('.nr').forEach(r=>{r.classList.remove('smr');r.style.display='';});
+  document.querySelectorAll('.jn').forEach(n=>n.classList.remove('smatch','hlit'));
+  document.querySelectorAll('.tr').forEach(r=>r.classList.remove('smt'));
+  document.querySelectorAll('.mn').forEach(n=>n.classList.remove('mm-hl'));
+  document.querySelectorAll('.mnrow').forEach(r=>r.classList.remove('hl'));
+  if(VIEW==='raw'){highlightRaw(SQ);cnt.textContent='';return;}
+  if(!SQ){cnt.textContent='';return;}
+  let count=0;
+  document.querySelectorAll('.nr').forEach(r=>{
+    if((r.dataset.rk||'').toLowerCase().includes(SQ)||(r.dataset.rv||'').includes(SQ)){
+      r.classList.add('smr');r.closest('.jn')&&r.closest('.jn').classList.add('smatch');count++;
+    }
+  });
+  document.querySelectorAll('.tr').forEach(r=>{
+    if((r.dataset.sv||'').includes(SQ)||(r.dataset.k||'').toLowerCase().includes(SQ)){r.classList.add('smt');count++;}
+  });
+  document.querySelectorAll('.mn').forEach(nd=>{
+    let m=(nd.dataset.key||'').toLowerCase().includes(SQ);
+    nd.querySelectorAll('.mnrow').forEach(r=>{
+      if((r.dataset.k||'').includes(SQ)||(r.dataset.v||'').includes(SQ)){r.classList.add('hl');m=true;count++;}
+    });
+    if(m) nd.classList.add('mm-hl');
+  });
+  cnt.textContent=count?count+' match'+(count>1?'es':''):'—';
+  const first=document.querySelector('.mm-hl')||document.querySelector('.smatch')||document.querySelector('.smt');
+  if(first&&VIEW!=='map') first.scrollIntoView({behavior:'smooth',block:'center'});
+  if(VIEW==='map'){
+    const f=document.querySelector('.mm-hl');
+    if(f){
+      const x=parseFloat(f.style.left)||0,y=parseFloat(f.style.top)||0;
+      const r=cva.getBoundingClientRect();
+      ox=r.width/2-x*sc-NODE_W*sc/2;
+      oy=r.height/2-y*sc-60;
+      applyT();
+    }
+  }
+}
+
+// ═══ VIEW SWITCH ═════════════════════════════════════════
+function setView(v,btn){
+  VIEW=v; nidx=0;
+  document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  if(DATA) render();
+}
+
+// ═══ FORMAT ══════════════════════════════════════════════
+function prettify(){
+  const el=document.getElementById('jIn'),r=el.value.trim(); if(!r)return;
+  try{el.value=JSON.stringify(JSON.parse(r),null,2);go();T('Prettified ✓');}catch(e){T('Invalid JSON','var(--red)');}
+}
+function minify(){
+  const el=document.getElementById('jIn'),r=el.value.trim(); if(!r)return;
+  try{el.value=JSON.stringify(JSON.parse(r));go();T('Minified ✓');}catch(e){T('Invalid JSON','var(--red)');}
+}
+function copyAll(){
+  const r=document.getElementById('jIn').value.trim(); if(!r)return T('Nothing to copy','var(--orange)');
+  try{copy(JSON.stringify(JSON.parse(r),null,2));}catch(e){copy(r);}
+}
+
+// ═══ FILE ════════════════════════════════════════════════
+function loadFile(e){
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{document.getElementById('jIn').value=ev.target.result;go();T('Loaded: '+f.name);};
+  r.readAsText(f); e.target.value='';
+}
+const eaEl=document.getElementById('ea');
+['dragenter','dragover'].forEach(ev=>eaEl.addEventListener(ev,e=>{e.preventDefault();eaEl.classList.add('dropping');}));
+['dragleave','drop'].forEach(ev=>eaEl.addEventListener(ev,e=>{e.preventDefault();eaEl.classList.remove('dropping');}));
+eaEl.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{document.getElementById('jIn').value=ev.target.result;go();T('Loaded: '+f.name);};r.readAsText(f);});
+// also drop on map
+const mw=document.getElementById('mapWrap');
+['dragenter','dragover'].forEach(ev=>mw.addEventListener(ev,e=>e.preventDefault()));
+mw.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{document.getElementById('jIn').value=ev.target.result;go();T('Loaded: '+f.name);};r.readAsText(f);});
+
+// ═══ PANEL + RESIZE ══════════════════════════════════════
+function togglePanel(){
+  const lp=document.getElementById('lp');
+  const isCollapsed=lp.classList.toggle('col');
+  const ptab=document.getElementById('ptab');
+  const rzr=document.getElementById('rzr');
+  if(isCollapsed){
+    ptab.textContent='▶';
+    ptab.title='Show panel';
+    rzr.style.pointerEvents='none';
+    rzr.style.width='0';
+  } else {
+    ptab.textContent='◀';
+    ptab.title='Hide panel';
+    rzr.style.pointerEvents='';
+    rzr.style.width='';
+    // Restore inner width from lpanel style if user resized
+    const inner=lp.querySelector('.lpanel-inner');
+    if(inner && lp.style.width && parseInt(lp.style.width)>0){
+      inner.style.width=lp.style.width;
+      inner.style.minWidth=lp.style.width;
+    }
+  }
+  setTimeout(()=>{if(VIEW==='map'&&DATA)fitMap();},280);
+}
+function clearAll(){
+  document.getElementById('jIn').value=''; DATA=null; showEmpty();
+  document.getElementById('eb').classList.remove('on');
+  document.getElementById('gSearch').value=''; document.getElementById('sCnt').textContent=''; SQ='';
+}
+function tabKey(e){if(e.key==='Tab'){e.preventDefault();const t=e.target,s=t.selectionStart;t.value=t.value.substring(0,s)+'  '+t.value.substring(t.selectionEnd);t.selectionStart=t.selectionEnd=s+2;}}
+const rzEl=document.getElementById('rzr'); let isRz=false;
+rzEl.addEventListener('mousedown',e=>{
+  const lp=document.getElementById('lp');
+  if(lp.classList.contains('col')) return;
+  isRz=true;rzEl.classList.add('drag');document.body.style.userSelect='none';document.body.style.cursor='col-resize';
+});
+window.addEventListener('mousemove',e=>{
+  if(!isRz)return;
+  const lp=document.getElementById('lp');
+  const inner=lp.querySelector('.lpanel-inner');
+  const w=e.clientX-lp.getBoundingClientRect().left;
+  if(w>160&&w<700){
+    lp.style.width=w+'px';
+    if(inner){inner.style.width=w+'px';inner.style.minWidth=w+'px';}
+  }
+});
+window.addEventListener('mouseup',()=>{if(isRz){isRz=false;rzEl.classList.remove('drag');document.body.style.userSelect='';document.body.style.cursor='';}});
+
+// keyboard shortcuts
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='p'){e.preventDefault();prettify();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();document.getElementById('gSearch').focus();}
+  if(VIEW==='map'&&(e.ctrlKey||e.metaKey)&&e.key==='0'){e.preventDefault();fitMap();}
+  if(VIEW==='map'&&e.key==='+'){zBy(0.15);}
+  if(VIEW==='map'&&e.key==='-'){zBy(-0.15);}
+});
+
+// ═══ SAMPLES ═════════════════════════════════════════════
+const SAMPLES={
+  user:{"id":"u_8f3a29","name":"Priya Sharma","email":"priya@example.com","age":28,"verified":true,"role":"admin","avatar":null,"address":{"street":"12 Marina Road","city":"Chennai","state":"Tamil Nadu","zip":"600001","country":"IN"},"preferences":{"theme":"dark","language":"en","notifications":{"email":true,"sms":false,"push":true}},"tags":["designer","developer","ux"],"createdAt":"2024-03-15T09:41:00Z"},
+  api:{"status":"success","code":200,"pagination":{"page":1,"perPage":10,"total":87},"data":[{"id":1,"title":"Build REST API","done":true,"priority":"high","assignee":"Ravi"},{"id":2,"title":"Write unit tests","done":false,"priority":"medium","assignee":"Meena"},{"id":3,"title":"Deploy to staging","done":false,"priority":"critical","assignee":"Karthik"}],"meta":{"server":"us-east-1","version":"3.2.1","ms":42}},
+  config:{"app":{"name":"ChromaLab","version":"2.0.0","env":"production","debug":false},"server":{"host":"0.0.0.0","port":8080,"ssl":true,"timeout":30},"database":{"host":"db.internal","port":5432,"name":"chromalab_prod","pool":{"min":2,"max":10,"idle":10000}},"cache":{"driver":"redis","ttl":3600},"features":{"colorBlindSim":true,"auditMatrix":true,"export":false}},
+  deep:{"level1":{"level2":{"level3":{"level4":{"level5":{"value":"deep!","count":42,"active":true},"info":"grandchild data","tags":["a","b"]},"config":{"timeout":30,"retries":3}},"meta":{"created":"2025-01-01","author":"dev"}},"settings":{"theme":"dark","lang":"en"}}}
+};
+function sample(n){
+  nidx=0;
+  const d=SAMPLES[n]; if(!d)return;
+  document.getElementById('jIn').value=JSON.stringify(d,null,2);
+  go(); T('Loaded: '+n);
+}
+
+// boot: show the api sample in map view
+sample('api');
+</script>
+</body>
+</html>
